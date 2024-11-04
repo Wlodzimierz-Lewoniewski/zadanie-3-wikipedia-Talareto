@@ -19,9 +19,16 @@ def extract_article_info(article_url):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
+    # Ekstrakcja odnośników wewnętrznych
     internal_links = [a.get('title') for a in soup.select('a[href^="/wiki/"]') if a.get('title')][:5]
+    
+    # Ekstrakcja URL obrazków
     images = [img.get('src') for img in soup.select('img')][:3]
+    
+    # Ekstrakcja źródeł
     references = [ref.get('href') for ref in soup.select('ol.references a[href^="http"]')][:3]
+    
+    # Ekstrakcja kategorii
     categories = [cat.text for cat in soup.select('div#catlinks a')][:3]
 
     return internal_links, images, references, categories
@@ -30,6 +37,7 @@ def format_output(articles_info):
     output_lines = []
     
     for internal_links, images, references, categories in articles_info:
+        # Formatuj wyniki dla każdego artykułu
         output_lines.append(" | ".join(internal_links) if internal_links else "")
         output_lines.append(" | ".join(images) if images else "")
         output_lines.append(" | ".join(references) if references else "")
@@ -38,7 +46,7 @@ def format_output(articles_info):
     return "\n".join(output_lines)
 
 def main():
-    category = input("Podaj nazwę kategorii w polskojęzycznej Wikipedii (np. 'Miasta na prawach powiatu'): ")
+    category = input().strip()  # Oczekujemy, że wejście będzie podane w odpowiednim formacie
     
     articles = get_articles_from_category(category)
     
