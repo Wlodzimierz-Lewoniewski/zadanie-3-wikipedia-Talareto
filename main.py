@@ -2,77 +2,80 @@ import requests
 from bs4 import BeautifulSoup
 import html
 
-def fetch_article_details(article_path):
+def extract_article_details(article_path):
     url = f'https://pl.wikipedia.org{article_path}'
+
     response = requests.get(url)
-    if response.status_code != 200:
-        print("Błąd podczas pobierania strony artykułu:", response.status_code)
-        return []
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    details = []
+    if response.status_code == 200:
+        content = response.text
+        result = []
+        
+        soup = BeautifulSoup(content, 'html.parser')
+        body_content = soup.find("div", class_="mw-body-content")
 
-    # Find main content area
-    body_content = soup.find("div", class_="mw-body-content")
-    if not body_content:
-        print("Nie znaleziono zawartości artykułu.")
-        return []
+        # Collect internal links (first 5)
+        internal_links = [link['title'] for link in body_content.find_all('a', href=True)
+                          if link['href'].startswith('/wiki/') and ':' not in link['href'][6:]][:5]
+        
+        internal_links_str = " | ".join(internal_links)
+        result.append(internal_links_str)
 
-    # Internal links
-    internal_links = [a.get('title') for a in body_content.find_all('a', href=True)
-                      if a['href'].startswith('/wiki/') and ':' not in a['href'][6:]][:5]
-    details.append("Wewnętrzne odnośniki: " + (" | ".join(internal_links) if internal_links else "Brak"))
+        # Collect image URLs (first 3)
+        images = body_content.find_all("img")
+        image_sources = [img["src"] for img in images if '/wiki/' not in img['src']][:3]
+        image_urls = " | ".join(image_sources) if image_sources else ""
+        
+        result.append(image_urls)
 
-    # Images
-    images = [img['src'] for img in body_content.find_all("img") if img['src'].startswith('//upload')][:3]
-    details.append("Obrazy: " + (" | ".join(images) if images else "Brak"))
+        # Collect external references URLs (first 3)
+        ref_section = soup.find("div", class_="mw-references-wrap mw-references-columns")
+        if ref_section is None:
+            ref_section = soup.find("div", class_="do-not-make-smaller refsection")
 
-    # External links in references section
-    references_section = soup.find("div", class_="mw-references-wrap") or soup.find("div", class_="refsection")
-    external_links = []
-    if references_section:
-        for ref in references_section.find_all("li"):
-            for link in ref.find_all("a", href=True):
-                if link['href'].startswith("http"):
-                    external_links.append(html.escape(link['href']))
-                    if len(external_links) == 3:
-                        break
-    details.append("Zewnętrzne linki: " + (" | ".join(external_links) if external_links else "Brak"))
+        external_links = ""
+        if ref_section:
+            links = ref_section.find_all("li")
+            external_links = [a['href'] for li in links
+                              for span in li.find_all("span", class_="reference-text")
+                              for a in span.find_all("a", href=True) if "http" in a['href']][:3]
+            external_links = " | ".join(html.escape(link) for link in external_links)
 
-    # Categories
-    category_section = soup.find("div", class_="mw-normal-catlinks")
-    if category_section:
-        category_links = [a.text.strip() for a in category_section.find('ul').find_all("a")[:3]]
-        details.append("Kategorie: " + (" | ".join(category_links) if category_links else "Brak"))
+        result.append(external_links)
+
+        # Collect categories (first 3)
+        category_section = soup.find("div", class_="mw-normal-catlinks")
+        if category_section:
+            category_list = category_section.find('ul')
+            categories = [cat.text.strip() for cat in category_list.find_all("a")[:3]]
+            categories_str = " | ".join(categories)
+            result.append(categories_str)
+        
+        return result
+
     else:
-        details.append("Kategorie: Brak")
+        print("Error fetching page:", response.status_code)
 
-    return details
+def main_process():
+    query = input().replace(" ", '_')
 
-def main():
-    category_name = input("Podaj nazwę kategorii: ").replace(" ", '_')
-    category_url = f'https://pl.wikipedia.org/wiki/Kategoria:{category_name}'
-
+    category_url = f'https://pl.wikipedia.org/wiki/Kategoria:{query}'
     response = requests.get(category_url)
-    if response.status_code != 200:
-        print("Błąd podczas pobierania strony kategorii:", response.status_code)
-        return
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    category_div = soup.find("div", class_="mw-category")
-    if not category_div:
-        print("Nie znaleziono kategorii na stronie.")
-        return
+    if response.status_code == 200:
+        category_content = response.text
+        soup = BeautifulSoup(category_content, 'html.parser')
+        
+        category_div = soup.find("div", class_="mw-category mw-category-columns")
+        links = [link["href"] for link in category_div.find_all("a")[:2]]
 
-    # Collect paths for the first two articles in the category
-    article_paths = [a['href'] for a in category_div.find_all("a", href=True)[:2]]
+        for link in links:
+            for detail in extract_article_details(link):
+                print(detail)
 
-    # Fetch and print details for each article
-    for i, path in enumerate(article_paths, start=1):
-        print(f"\n--- Artykuł {i} ---")
-        article_details = fetch_article_details(path)
-        for detail in article_details:
-            print(detail)
+    else:
+        print("Error fetching category page:", response.status_code)
 
 if __name__ == "__main__":
-    main()
+    main_process()
+
