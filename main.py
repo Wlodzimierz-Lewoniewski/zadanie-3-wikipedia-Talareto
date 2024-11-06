@@ -8,14 +8,19 @@ def fetch_article_details(article_path):
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
         details = []
+
         body_content = soup.find("div", class_="mw-body-content")
+
+        # Wewnętrzne odnośniki
         internal_links = [a.get('title') for a in body_content.find_all('a', href=True)
                           if a['href'].startswith('/wiki/') and ':' not in a['href'][6:]][:5]
         details.append(" | ".join(internal_links))
+
+        # Obrazy
         images = [img['src'] for img in body_content.find_all("img") if img['src'].startswith('//upload')][:3]
         details.append(" | ".join(images) if images else "")
 
-
+        # Zewnętrzne linki
         references_section = soup.find("div", class_="mw-references-wrap") or soup.find("div", class_="refsection")
         external_links = []
         if references_section:
@@ -27,7 +32,7 @@ def fetch_article_details(article_path):
                             break
         details.append(" | ".join(external_links))
 
-
+        # Kategorie
         category_section = soup.find("div", class_="mw-normal-catlinks")
         if category_section:
             category_links = [a.text.strip() for a in category_section.find('ul').find_all("a")[:3]]
