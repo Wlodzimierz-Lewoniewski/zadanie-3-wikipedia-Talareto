@@ -14,21 +14,21 @@ def extract_article_details(article_path):
         soup = BeautifulSoup(content, 'html.parser')
         body_content = soup.find("div", class_="mw-body-content")
 
-        # Collect internal links (first 5)
+       
         internal_links = [link['title'] for link in body_content.find_all('a', href=True)
                           if link['href'].startswith('/wiki/') and ':' not in link['href'][6:]][:5]
         
         internal_links_str = " | ".join(internal_links)
         result.append(internal_links_str)
 
-        # Collect image URLs (first 3)
+    
         images = body_content.find_all("img")
         image_sources = [img["src"] for img in images if '/wiki/' not in img['src']][:3]
         image_urls = " | ".join(image_sources) if image_sources else ""
         
         result.append(image_urls)
 
-        # Collect external references URLs (first 3)
+        
         ref_section = soup.find("div", class_="mw-references-wrap mw-references-columns")
         if ref_section is None:
             ref_section = soup.find("div", class_="do-not-make-smaller refsection")
@@ -43,7 +43,7 @@ def extract_article_details(article_path):
 
         result.append(external_links)
 
-        # Collect categories (first 3)
+        
         category_section = soup.find("div", class_="mw-normal-catlinks")
         if category_section:
             category_list = category_section.find('ul')
